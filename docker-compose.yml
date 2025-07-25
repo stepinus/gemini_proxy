@@ -1,0 +1,14 @@
+version: '3.8'
+
+services:
+  gemini-proxy:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      - ADMIN_PASSWORD=admin123
+      - NODE_ENV=production
+    volumes:
+      - ./data:/app/data
+    restart: unless-stopped
+    container_name: gemini-proxy-api

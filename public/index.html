@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="ru">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gemini API Proxy - Управление ключами</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #555;
+        }
+
+        input[type="password"],
+        input[type="text"] {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 16px;
+        }
+
+        button {
+            background-color: #007bff;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-right: 10px;
+        }
+
+        button:hover {
+            background-color: #0056b3;
+        }
+
+        .delete-btn {
+            background-color: #dc3545;
+        }
+
+        .delete-btn:hover {
+            background-color: #c82333;
+        }
+
+        .keys-list {
+            margin-top: 30px;
+        }
+
+        .key-item {
+            background-color: #f8f9fa;
+            padding: 15px;
+            margin-bottom: 10px;
+            border-radius: 5px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .message {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+        }
+
+        .success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .info {
+            background-color: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>🔑 Управление API ключами Gemini</h1>
+
+        <div class="form-group">
+            <label for="password">Пароль администратора:</label>
+            <input type="password" id="password" placeholder="Введите пароль">
+        </div>
+
+        <button onclick="loadKeys()">Загрузить ключи</button>
+
+        <div id="message"></div>
+
+        <div id="addKeySection" class="hidden">
+            <h3>Добавить новый API ключ</h3>
+            <div class="form-group">
+                <label for="newApiKey">API ключ:</label>
+                <input type="text" id="newApiKey" placeholder="Введите API ключ Gemini">
+            </div>
+            <button onclick="addKey()">Добавить ключ</button>
+        </div>
+
+        <div id="keysList" class="keys-list hidden">
+            <h3>Список API ключей</h3>
+            <div id="keysContainer"></div>
+            <div id="statsInfo" class="info"></div>
+        </div>
+    </div>
+
+    <script>
+        function showMessage(text, type = 'info') {
+            const messageDiv = document.getElementById('message');
+            messageDiv.innerHTML = text;
+            messageDiv.className = `message ${type}`;
+            setTimeout(() => {
+                messageDiv.innerHTML = '';
+                messageDiv.className = '';
+            }, 5000);
+        }
+
+        async function loadKeys() {
+            const password = document.getElementById('password').value;
+            if (!password) {
+                showMessage('Введите пароль', 'error');
+                return;
+            }
+
+            try {
+                const response = await fetch('/admin/keys', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ password })
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    showMessage(data.error, 'error');
+                    return;
+                }
+
+                document.getElementById('addKeySection').classList.remove('hidden');
+                document.getElementById('keysList').classList.remove('hidden');
+
+                displayKeys(data.keys);
+                updateStats(data.total, data.currentIndex);
+                showMessage('Ключи загружены успешно', 'success');
+
+            } catch (error) {
+                showMessage('Ошибка загрузки ключей', 'error');
+            }
+        }
+
+        function displayKeys(keys) {
+            const container = document.getElementById('keysContainer');
+            container.innerHTML = '';
+
+            if (keys.length === 0) {
+                container.innerHTML = '<p>Нет добавленных ключей</p>';
+                return;
+            }
+
+            keys.forEach((key, index) => {
+                const keyDiv = document.createElement('div');
+                keyDiv.className = 'key-item';
+                keyDiv.innerHTML = `
+                    <span><strong>Ключ ${index + 1}:</strong> ${key.key}</span>
+                    <button class="delete-btn" onclick="deleteKey(${index})">Удалить</button>
+                `;
+                container.appendChild(keyDiv);
+            });
+        }
+
+        function updateStats(total, currentIndex) {
+            const statsDiv = document.getElementById('statsInfo');
+            statsDiv.innerHTML = `
+                <strong>Статистика:</strong> Всего ключей: ${total}, 
+                Следующий ключ для использования: ${currentIndex + 1}
+            `;
+        }
+
+        async function addKey() {
+            const password = document.getElementById('password').value;
+            const apiKey = document.getElementById('newApiKey').value;
+
+            if (!password || !apiKey) {
+                showMessage('Введите пароль и API ключ', 'error');
+                return;
+            }
+
+            try {
+                const response = await fetch('/admin/keys/add', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ password, apiKey })
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    showMessage(data.error, 'error');
+                    return;
+                }
+
+                document.getElementById('newApiKey').value = '';
+                showMessage(data.message, 'success');
+                loadKeys(); // Перезагружаем список
+
+            } catch (error) {
+                showMessage('Ошибка добавления ключа', 'error');
+            }
+        }
+
+        async function deleteKey(keyIndex) {
+            const password = document.getElementById('password').value;
+
+            if (!confirm('Вы уверены, что хотите удалить этот ключ?')) {
+                return;
+            }
+
+            try {
+                const response = await fetch('/admin/keys/delete', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ password, keyIndex })
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    showMessage(data.error, 'error');
+                    return;
+                }
+
+                showMessage(data.message, 'success');
+                loadKeys(); // Перезагружаем список
+
+            } catch (error) {
+                showMessage('Ошибка удаления ключа', 'error');
+            }
+        }
+    </script>
+</body>
+
+</html>
